@@ -39,69 +39,24 @@ CFLAGS  += -B include/dev/$(DEVICE) -I include
 help:
 	@echo "Use the following commands:"
 	@echo "make all       compile and build $(TARGET).elf/.bin/.hex/.asm for $(DEVICE)"
-	@echo "make hex       compile and build $(TARGET).hex for $(DEVICE)"
-	@echo "make asm       compile and disassemble to $(TARGET).asm for $(DEVICE)"
-	@echo "make bin       compile and build $(TARGET).bin for $(DEVICE)"
 	@echo "make upload    compile and upload to $(DEVICE)"
 	@echo "make fuses     burn fuses of $(DEVICE)"
-	@echo "make install   compile, upload and burn fuses for $(DEVICE)"
+	@echo "make install   compile, upload, and burn fuses for $(DEVICE)"
 	@echo "make clean     remove all build files"
 
-all:	buildelf buildbin buildhex buildasm removetemp size
+all: build removetemp size
 
-elf:	buildelf removetemp size
+build: $(TARGET).elf $(TARGET).bin $(TARGET).hex $(TARGET).asm
 
-bin:	buildelf buildbin removetemp size removeelf
-
-hex:	buildelf buildhex removetemp size removeelf
-
-asm:	buildelf buildasm removetemp size removeelf
-
-flash:	install
-
-install:	bin
-	@echo "Installing to $(DEVICE) ..."
-	@$(PYPROG) --fuses 0:$(FUSE0) 1:$(FUSE1) 2:$(FUSE2) 4:$(FUSE4) 5:$(FUSE5) 6:$(FUSE6) 7:$(FUSE7) 8:$(FUSE8) --flash $(TARGET).bin
-
-upload:	bin
-	@echo "Uploading to $(DEVICE) ..."
-	@$(PYPROG) --flash $(TARGET).bin
-
-fuses:
-	@echo "Burning fuses of $(DEVICE) ..."
-	@$(PYPROG) --fuses 0:$(FUSE0) 1:$(FUSE1) 2:$(FUSE2) 4:$(FUSE4) 5:$(FUSE5) 6:$(FUSE6) 7:$(FUSE7) 8:$(FUSE8)
-
-clean:
-	@echo "Cleaning all up ..."
-	@$(CLEAN)
-	@rm -f $(TARGET).elf $(TARGET).bin $(TARGET).hex $(TARGET).asm
-
-buildelf:
+$(TARGET).elf: $(SKETCH)
 	@echo "Compiling $(SKETCH) for $(DEVICE) @ $(CLOCK)Hz ..."
-	@$(CC) $(CFLAGS) $(SKETCH) -o $(TARGET).elf
+	@$(CC) $(CFLAGS) $< -o $@
 
-buildbin:
-	@echo "Building $(TARGET).bin ..."
-	@$(OBJCOPY) -O binary -R .eeprom $(TARGET).elf $(TARGET).bin
+$(TARGET).bin: $(TARGET).elf
+	@echo "Building $@ ..."
+	@$(OBJCOPY) -O binary -R .eeprom $< $@
 
-buildhex:
-	@echo "Building $(TARGET).hex ..."
-	@$(OBJCOPY) -j .text -j .data -O ihex $(TARGET).elf $(TARGET).hex
+$(TARGET).hex: $(TARGET).elf
+	@echo "Building $@ ..."
+	@$(OBJCOPY) -j .text -j .data -O ihex $< $@
 
-buildasm:
-	@echo "Disassembling to $(TARGET).asm ..."
-	@$(OBJDUMP) -d $(TARGET).elf > $(TARGET).asm
-
-size:
-	@echo "------------------"
-	@echo "FLASH: $(shell $(AVRSIZE) -d $(TARGET).elf | awk '/[0-9]/ {print $$1 + $$2}') bytes"
-	@echo "SRAM:  $(shell $(AVRSIZE) -d $(TARGET).elf | awk '/[0-9]/ {print $$2 + $$3}') bytes"
-	@echo "------------------"
-
-removetemp:
-	@echo "Removing temporary files ..."
-	@$(CLEAN)
-
-removeelf:
-	@echo "Removing $(TARGET).elf ..."
-	@rm -f $(TARGET).elf
